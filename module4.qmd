@@ -16,11 +16,11 @@ library(tidyverse)
 
 ### Use of GitHub
 
-Link to your forked GH repository:
+Link to your forked GH repository: https://github.com/tbaugh323/Module4-redlining.git
 
 ### Use of Quarto
 
-Link to your .qmd file:
+Link to your .qmd file: https://github.com/tbaugh323/Module4-redlining/blob/main/module4.qmd
 
 # Ecological consequences of redlining
 
@@ -34,6 +34,8 @@ We will use a vector dataset of redlining maps from [Mapping Inequality](https:/
 
 Click 'Explore the Maps' to look at some cities and neighborhoods you are familiar with. Who is the intended audience of this data science project, and how are the data used to communicate understanding, insight, and knowledge? Why is this effective?
 
+This data science project seems to appeal to a general audience. The 'history' sections provide relevant historical fun facts about the regions. The vibrant colors overlayed with the traditional map style give the website an appealing aesthetic while also conveying spatial patterns in the data. However, the ability to tabulate and download data could also indicate that this project could be used by other scientists as well. The project is effective because the UI is easy to use and is visually appealing for both leisure and academic purposes.
+
 ### Q2 (1 point)
 
 Create a `data/` folder in the root of your project and create five subfolders labeled with the city names from Fig. 2 of Schell et al. 2020. Because the spatial files will be large, add `data/` to the .gitignore file. 
@@ -43,6 +45,17 @@ Then, go back to the home page of [Mapping Inequality](https://dsl.richmond.edu/
 Import the geojson file into your R environment with the `st_read`()` function from sf. Check the structure of this object and see that it is a special type of data frame, allowing it to be manipulated with many of the functions you already know, including ggplot. 
 
 Make a quick plot of your first city showing the "grade" in color using ggplot syntax and `geom_sf()`. Select a color scheme that better comports with redlining. 
+
+```{r}
+baltimore <- st_read('data/baltimore/geojson.json')
+
+ggplot() + 
+  geom_sf(data = baltimore, aes(fill = grade)) + 
+  scale_fill_manual(values = c('green', 'blue', 'orange', 'red')) + 
+  ggtitle('Baltimore')
+
+```
+
 
 ## The raster data
 
