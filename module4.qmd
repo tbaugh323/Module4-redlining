@@ -47,12 +47,12 @@ Import the geojson file into your R environment with the `st_read`()` function f
 Make a quick plot of your first city showing the "grade" in color using ggplot syntax and `geom_sf()`. Select a color scheme that better comports with redlining. 
 
 ```{r}
-baltimore <- st_read('data/baltimore/geojson.json')
+minneapolis <- st_read('data/minneapolis/geojson.json')
 
 ggplot() + 
-  geom_sf(data = baltimore, aes(fill = grade)) + 
+  geom_sf(data = minneapolis, aes(fill = grade)) + 
   scale_fill_manual(values = c('green', 'blue', 'orange', 'red')) + 
-  ggtitle('Baltimore')
+  ggtitle('Minneapolis')
 
 ```
 
@@ -80,14 +80,114 @@ For each city, locate the 10m resolution files for the B04 and B08 bands along w
 Use the terra package and the `rast()` function to import the two bands, which are reported as digital numbers. 
 Combine to calculate NDVI ($ (NIR - R) / (NIR + R)$) and display a quick plot of your first city. 
 
+```{r}
+minneapolis_R <- rast('data/minneapolis/T15TVK_20260714T165849_B04_10m.jp2')
+minneapolis_NIR <- rast('data/minneapolis/T15TVK_20260714T165849_B08_10m.jp2')
+
+minneapolis_NDVI <- (minneapolis_NIR - minneapolis_R) / (minneapolis_NIR + minneapolis_R)
+
+minneapolis_spat <- rast(xmin = -93.4, xmax = -93.148, ymin = 44.87, ymax = 45.1, crs = 'EPSG:4326')
+
+minneapolis_spat <- terra::project(x = minneapolis_spat, y = crs('EPSG:32615'))
+
+minneapolis_NDVI <- terra::crop(minneapolis_NDVI, minneapolis_spat)
+
+ggplot() + 
+  geom_spatraster(data = minneapolis_NDVI) + 
+  scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent')
+
+```
+
+
 ### Bonus 1 (1 point)
 Since you have 5 cities to plot, can you optimize the same operations as Q3 with a for loop? 
+
+```{r}
+city_names <- list('baltimore_NDVI',
+              'birmingham_NDVI',
+              'indianapolis_NDVI',
+              'minneapolis_NDVI',
+              'phoenix_NDVI')
+
+R_paths <- c('data/baltimore/T18SUJ_20260916T154901_B04_10m.jp2', 
+             'data/birmingham/T16SEC_20260513T161829_B04_10m.jp2',
+             'data/indianapolis/T16TEK_20261003T163119_B04_10m.jp2',
+             'data/minneapolis/T15TVK_20260714T165849_B04_10m.jp2',
+             'data/phoenix/T12SUC_20260111T181731_B04_10m.jp2')
+
+NIR_paths <- c('data/baltimore/T18SUJ_20260916T154901_B08_10m.jp2',
+               'data/birmingham/T16SEC_20260513T161829_B08_10m.jp2',
+               'data/indianapolis/T16TEK_20261003T163119_B08_10m.jp2',
+               'data/minneapolis/T15TVK_20260714T165849_B08_10m.jp2',
+               'data/phoenix/T12SUC_20260111T181731_B08_10m.jp2')
+
+spat_extents <- list(list(xmin = -76.78, xmax = -76.46, ymin = 39.14, ymax = 39.44),
+                     list(xmin = -87.18, xmax = -86.54, ymin = 33.18, ymax = 33.78),
+                     list(xmin = -86.39, xmax = -85.95, ymin = 39.64, ymax = 40.0),
+                     list(xmin = -93.4, xmax = -93.148, ymin = 44.87, ymax = 45.1),
+                     list(xmin = -112.13, xmax = -112.01, ymin = 33.42, ymax = 33.54))
+
+
+for(i in 1:5){
+  R <- rast(R_paths[i])
+  NIR <- rast(NIR_paths[i])
+  
+  NDVI <- (NIR - R) / (NIR + R)
+  
+  spat <- rast(xmin = as.numeric(spat_extents[[i]][1]),
+               xmax = as.numeric(spat_extents[[i]][2]),
+               ymin = as.numeric(spat_extents[[i]][3]),
+               ymax = as.numeric(spat_extents[[i]][4]),
+               crs = 'EPSG:4326')
+  
+  spat <- terra::project(x = spat, y = crs(NDVI))
+  
+  assign(paste0(city_names[i]), terra::crop(NDVI, spat))
+  
+  plot <- ggplot() + 
+    geom_spatraster(data = get(as.character(city_names[i]))) + 
+    scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent') + 
+    ggtitle(as.character(city_names[i]))
+  
+  print(plot)
+}
+
+```
+
 
 ### Q4 (1 point)
 Do the rasters and polygons share the same coordinate reference system? If not, project both into the same CRS and justify your choice. 
 
+```{r}
+baltimore_redlines <- st_read('data/baltimore/geojson.json')
+birmingham_redlines <- st_read('data/birmingham/geojson.json')
+indianapolis_redlines <- st_read('data/indianapolis/geojson.json')
+minneapolis_redlines <- st_read('data/minneapolis/geojson.json')
+phoenix_redlines <- st_read('data/phoenix/geojson.json')
+
+baltimore_redlines <- st_transform(baltimore_redlines, crs = st_crs(baltimore_NDVI))
+birmingham_redlines <- st_transform(birmingham_redlines, crs = st_crs(birmingham_NDVI))
+indianapolis_redlines <- st_transform(indianapolis_redlines, crs = st_crs(indianapolis_NDVI))
+minneapolis_redlines <- st_transform(minneapolis_redlines, crs = st_crs(minneapolis_NDVI))
+phoenix_redlines <- st_transform(phoenix_redlines, crs = st_crs(phoenix_NDVI))
+```
+
+The rasters and polygons were not of the same coordinate reference system. We projected the polygons to match the coordinate system of the rasters because the polygons are smaller objects, making the conversion more computationally efficient.
+
+
 ### Q5 (1 points)
 Overlay the projected vector file onto the projected NDVI for a single city using `tidyterra::geom_spatraster()` in addition to `geom_sf()`. Adjust the color scales and add a scale bar to approximate Fig. 2a of Schell et al. 2020. 
+
+```{r}
+ggplot() + 
+  geom_spatraster(data = baltimore_NDVI) + 
+  scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent') +
+  geom_sf(data = baltimore_redlines, aes(color = grade), fill = 'transparent', linewidth = 1.2) +
+  scale_color_manual(values = c('green', 'blue', 'orange', 'red')) +  
+  ggtitle('Baltimore') + 
+  labs(fill = 'NDVI')
+```
+
 
 ### Q6 (1 point)
 Repeat the above for all 5 cities and add the city name. Explore the `cowplot` or `patchwork` packages to create a multi-panel figure. 
