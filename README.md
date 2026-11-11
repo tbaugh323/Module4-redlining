@@ -1,7 +1,10 @@
 # Module 4: Redlining
 
 ## Team members and contributions
-To be updated
+Team members: Matthew Simpson and Taylor Baugh
+Contributions: We both contributed equally to this assignment. However, since the data files were
+so large, we did everything on Matthew's computer, and just swapped who was typing. The commits
+indicate who was typing for which questions.
 
 ## Learning objectives
 

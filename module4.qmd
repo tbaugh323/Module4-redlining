@@ -12,6 +12,8 @@ library(sf) # simple features for R
 library(terra) # spatial data analysis
 library(tidyterra) #tidyverse methods for terra objects
 library(tidyverse)
+library(cowplot)
+theme_set(theme_bw())
 ```
 
 ### Use of GitHub
@@ -192,16 +194,123 @@ ggplot() +
 ### Q6 (1 point)
 Repeat the above for all 5 cities and add the city name. Explore the `cowplot` or `patchwork` packages to create a multi-panel figure. 
 
+```{r}
+baltimore_fullplot <- ggplot() + 
+  geom_spatraster(data = baltimore_NDVI) + 
+  scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent') +
+  geom_sf(data = baltimore_redlines, aes(color = grade), fill = 'transparent', linewidth = 1.2) +
+  scale_color_manual(values = c('green', 'blue', 'orange', 'red')) +  
+  ggtitle('Baltimore') + 
+  theme(legend.position = "none")
+
+birmingham_fullplot <- ggplot() + 
+  geom_spatraster(data = birmingham_NDVI) + 
+  scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent') +
+  geom_sf(data = birmingham_redlines, aes(color = grade), fill = 'transparent', linewidth = 1.2) +
+  scale_color_manual(values = c('green', 'blue', 'orange', 'red')) +  
+  ggtitle('Birmingham') + 
+  theme(legend.position = "none")
+
+indianapolis_fullplot <- ggplot() + 
+  geom_spatraster(data = indianapolis_NDVI) + 
+  scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent') +
+  geom_sf(data = indianapolis_redlines, aes(color = grade), fill = 'transparent', linewidth = 1.2) +
+  scale_color_manual(values = c('green', 'blue', 'orange', 'red')) +  
+  ggtitle('Indianapolis') + 
+  theme(legend.position = "none")
+
+minneapolis_fullplot <- ggplot() + 
+  geom_spatraster(data = minneapolis_NDVI) + 
+  scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent') +
+  geom_sf(data = minneapolis_redlines, aes(color = grade), fill = 'transparent', linewidth = 1.2) +
+  scale_color_manual(values = c('green', 'blue', 'orange', 'red')) +  
+  ggtitle('Minneapolis') + 
+  labs(fill = 'NDVI')
+
+phoenix_fullplot <- ggplot() + 
+  geom_spatraster(data = phoenix_NDVI) + 
+  scale_fill_gradient2(low = 'grey', high = 'forestgreen', na.value = 'transparent') +
+  geom_sf(data = phoenix_redlines, aes(color = grade), fill = 'transparent', linewidth = 1.2) +
+  scale_color_manual(values = c('green', 'blue', 'orange', 'red')) +  
+  ggtitle('Phoenix') + 
+  theme(legend.position = "none")
+
+plot_grid(indianapolis_fullplot, baltimore_fullplot, phoenix_fullplot, birmingham_fullplot, minneapolis_fullplot,
+          ncol = 3)
+```
+
+
 ### Q7 (2 points)
 Now, let's examine the relationship between redlining and NDVI. Temporarily re-read in your redlining polygons using `terra:::vect()`. You can use `terra:extract()` on these temporary polygons within `mutate()` on your original polygons read in with `read_sf()`. Because the output of `terra::extract()` is a data.frame, `dplyr::pull()` can be helpful. 
 
 Extract the mean, median, and central 95% quantile of NDVI from each delineated neighborhood while retaining the identity of the city. Perform your choice of at least two exploratory data visualizations utilizing different variables to evaluate this relationship and examine whether it differs between cities. 
+
+```{r}
+NDVI_stats <- data.frame(city = character(), grade = character(), mean = numeric(), median = numeric(), quant = numeric())
+
+cities <- c('baltimore',
+            'birmingham',
+            'indianapolis',
+            'minneapolis',
+            'phoenix')
+
+for (i in cities) {
+  city_redlines <- terra::vect(paste0('data/', i, '/geojson.json'))
+  city_NDVI <- get(paste0(i, "_NDVI"))
+  
+  grades <- c("A", "B", "C", "D")
+  for (j in grades) {
+    city_redlines_small <- city_redlines |> 
+      filter(grade == j)
+    
+    city_NDVI_small <- mutate(terra::extract(x = city_NDVI, y = city_redlines_small))
+    
+    NDVI_stats <- add_row(NDVI_stats, 
+                          city = i, 
+                          grade = j,
+                          mean = mean(pull(city_NDVI_small)), 
+                          median = median(pull(city_NDVI_small)), 
+                          quant = quantile(pull(city_NDVI_small), probs = 0.95))
+  }
+}
+
+NDVI_stats |> 
+  ggplot(aes(x = grade, y = median, fill = grade)) +
+  geom_col() +
+  scale_fill_manual(values = c('green', 'blue', 'orange', 'red')) +
+  facet_wrap(~ city) +
+  labs(y = "Median NDVI", x = "Grade") +
+  theme(legend.position = "none")
+
+NDVI_stats |> 
+  pivot_longer(cols = c(mean, median, quant), names_to = "stat", values_to = "value") |> 
+  ggplot(aes(x = grade, y = value, fill = grade)) +
+  geom_col() +
+  scale_fill_manual(values = c('green', 'blue', 'orange', 'red')) +
+  facet_wrap(~ stat) + 
+  labs(y = "Value", x = "Grade") +
+  theme(legend.position = "none")
+
+```
+
 
 ### Bonus 2 (1 point)
 Perform a statistical test to support your visual analysis above. 
 
 ### Q8 (2 points)
 Create a final plot and describe whether NDVI is associated with historical redlining. Does this pattern differ between the five cities examined here? If so, how? 
+
+```{r}
+NDVI_stats |> 
+  ggplot(aes(x = grade, y = mean, fill = grade)) +
+  geom_col() +
+  scale_fill_manual(values = c('green', 'blue', 'orange', 'red')) +
+  facet_wrap(~ city) +
+  labs(y = "Mean NDVI", x = "Grade") +
+  theme(legend.position = "none")
+```
+
+NDVI is associated with historical redlining. Across all three summary statistics we calculated (mean, median, 95 quantile), NDVI increased as neighborhood "quality" increased. However, this pattern was not the same across all five cities. Some cities saw clear NDVI increases with each neighborhood grade increase. For example, Phoenix and Minneapolis showed a linear relationship between grade and NDVI. Other cities saw this positive association "level off". For example, the difference in NDVI between "A" and "B" neighborhoods in Baltimore is not as stark as the NDVI difference between "D" and "C" neighborhoods. The only exception to this pattern is Birmingham, in which "C" neighborhoods had a lower mean, median, and 95 quantile NDVI than "D" neighborhoods, and Baltimore's 95 quantile of NDVI for "A" neighborhoods was slightly lower than "B" neighborhoods.
 
 ### Bonus 3 (1 point)
 Include the results of your statistical test in the final plot and use prose to incorporate statistical output in the context of the question above. 
